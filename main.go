@@ -61,20 +61,20 @@ func setFunc(typeIn string) func(s string) (int, error) {
 func readData(sourceChan <-chan string, count chan<- int, countGR chan struct{}, f func(s string) (int, error)) {
 	var wg sync.WaitGroup
 
-	for fileName := range sourceChan {
+	for source := range sourceChan {
 		wg.Add(1)
 		countGR <- struct{}{}
 
-		go func(fileName string) {
+		go func(source string) {
 			defer wg.Done()
-			cnt, err := f(fileName)
+			cnt, err := f(source)
 			if err != nil {
 				log.Printf("fail to read file %s", err.Error())
 				return
 			}
 			count <- cnt
 			<-countGR
-		}(fileName)
+		}(source)
 	}
 	wg.Wait()
 	close(count)
