@@ -1,20 +1,20 @@
 package main
 
 import (
-	"flag"
-	"regexp"
 	"bufio"
-	"os"
-	"strings"
-	"log"
-	"sync"
-	"io/ioutil"
+	"flag"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
+	"regexp"
+	"strings"
+	"sync"
 )
 
-func main()  {
+func main() {
 	countGR := make(chan struct{}, 5) //k горутин
 	sourceChan := make(chan string)
 	countChan := make(chan int)
@@ -23,9 +23,6 @@ func main()  {
 	flag.StringVar(&typeIn, "type", "url", "var from command line.")
 	flag.Parse()
 
-	if typeIn != "url" && typeIn != "file" {
-		log.Fatalln("type is not correct")
-	}
 	f := setFunc(typeIn) //определяем тип операции
 
 	go getInputData(sourceChan, typeIn)
@@ -33,15 +30,16 @@ func main()  {
 	countResult(countChan)
 }
 
-func getInputData(sourceChan chan <- string, typeIn string) {
+func getInputData(sourceChan chan<- string, typeIn string) {
 	defer close(sourceChan)
+	var urlReg = regexp.MustCompile(`http(s)?://[a-z0-9-]+(.[a-z0-9-]+)*(:[0-9]+)?(/.*)?`)
 	//читаем данные с консоли
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		record := scanner.Text()
 		lines := strings.Split(record, `\n`)
 		for _, line := range lines {
-			if prepareData(line, typeIn) {
+			if prepareData(line, typeIn, urlReg) {
 				sourceChan <- line //в канал sourceChan записываем либо url либо имя файла
 			}
 		}
@@ -50,6 +48,9 @@ func getInputData(sourceChan chan <- string, typeIn string) {
 
 func setFunc(typeIn string) func(s string) (int, error) {
 	//var f = func(s string) (i int, e error) {return}
+	if typeIn != "url" && typeIn != "file" {
+		log.Fatalln("type is not correct")
+	}
 	f := makeRequest
 	if typeIn == "file" {
 		f = getContentFromFile
@@ -82,7 +83,7 @@ func readData(sourceChan <-chan string, count chan<- int, countGR chan struct{},
 
 func getContentFromFile(fileName string) (int, error) {
 	content, err := ioutil.ReadFile(fileName)
-	if err !=nil {
+	if err != nil {
 		return 0, err
 	}
 	count := strings.Count(string(content), "Go")
@@ -121,8 +122,7 @@ func countResult(countChan <-chan int) {
 	fmt.Println("Total:", count)
 }
 
-func prepareData(str, typeIn string) bool {
-	var urlReg = regexp.MustCompile(`http(s)?://[a-z0-9-]+(.[a-z0-9-]+)*(:[0-9]+)?(/.*)?`)
+func prepareData(str, typeIn string, urlReg *regexp.Regexp) bool {
 	if typeIn == "file" {
 		if _, err := os.Stat(str); os.IsNotExist(err) {
 			log.Printf("file %s does not exist", str)
